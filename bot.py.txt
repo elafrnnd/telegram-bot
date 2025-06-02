@@ -1,21 +1,30 @@
-from telegram import Update, Bot
+from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
     ContextTypes,
     MessageHandler,
     filters,
 )
-import os
+import asyncio
+from datetime import datetime
 
 # === CONFIGURATION ===
-BOT_TOKEN = '8043955129:AAGiatxpVMhkKrjUV_Jj79K5e7FRyAtJK2I'
-SOURCE_USER_ID = 7635291775  # Replace with the Telegram user ID to forward from
-TARGET_GROUPS = [-1001111111111, -1002222222222]  # Replace with your group chat IDs
+BOT_TOKEN = 8043955129:AAGiatxpVMhkKrjUV_Jj79K5e7FRyAtJK2I
+SOURCE_USER_ID = 7635291775
+TARGET_GROUPS = 2442024861
+SEND_INTERVAL = 10 * 60  # 1 minutes (in seconds)
 
-# === MESSAGE FORWARDING HANDLER ===
+# === MEMORY TO HOLD LAST MESSAGE ===
+latest_message = None
+
+# === HANDLER TO CAPTURE AND FORWARD IMMEDIATELY ===
 async def forward_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Only forward messages from the specific user
+    global latest_message
+
     if update.effective_user and update.effective_user.id == SOURCE_USER_ID:
+        latest_message = update.message  # Store latest message
+        print("📥 New message received from source user.")
+
         for group_id in TARGET_GROUPS:
             try:
                 await context.bot.copy_message(
@@ -23,20 +32,40 @@ async def forward_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     from_chat_id=update.effective_chat.id,
                     message_id=update.message.message_id
                 )
-                print(f"✅ Forwarded message to {group_id}")
+                print(f"✅ Immediately forwarded to {group_id}")
             except Exception as e:
-                print(f"❌ Error sending to {group_id}: {e}")
+                print(f"❌ Failed to forward to {group_id}: {e}")
+
+# === REPEAT SCHEDULE FUNCTION ===
+async def repeat_forward(bot):
+    global latest_message
+    while True:
+        if latest_message:
+            for group_id in TARGET_GROUPS:
+                try:
+                    await bot.copy_message(
+                        chat_id=group_id,
+                        from_chat_id=latest_message.chat.id,
+                        message_id=latest_message.message_id
+                    )
+                    print(f"⏰ Auto-forwarded to {group_id} at {datetime.now()}")
+                except Exception as e:
+                    print(f"❌ Failed to auto-send to {group_id}: {e}")
+        await asyncio.sleep(SEND_INTERVAL)
 
 # === MAIN FUNCTION ===
 async def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
+    # Listen for all messages to filter by user ID
     app.add_handler(MessageHandler(filters.ALL, forward_handler))
 
-    print("🚀 Bot is running and forwarding messages from user", SOURCE_USER_ID)
+    # Background task to auto-forward latest message
+    asyncio.create_task(repeat_forward(app.bot))
+
+    print("🚀 Bot is running. Will forward and re-send every 10 minutes.")
     await app.run_polling()
 
-# === START SCRIPT ===
+# === START BOT ===
 if __name__ == '__main__':
-    import asyncio
     asyncio.run(main())

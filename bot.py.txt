@@ -1,0 +1,49 @@
+from telegram import Update, Bot
+from telegram.ext import (
+    ApplicationBuilder,
+    ContextTypes,
+    MessageHandler,
+    filters,
+)
+import asyncio
+from datetime import datetime
+import os
+
+# --- CONFIGURATION ---
+BOT_TOKEN = os.environ.get("BOT_TOKEN")  # Use environment variable on Render
+TARGET_GROUPS = [-1001111111111, -1002222222222]
+SCHEDULE_INTERVAL_SECONDS = 10 * 60  # 10 minutes
+
+async def forward_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    for group_id in TARGET_GROUPS:
+        try:
+            await context.bot.copy_message(
+                chat_id=group_id,
+                from_chat_id=update.effective_chat.id,
+                message_id=update.message.message_id
+            )
+            print(f"✅ Forwarded message to {group_id}")
+        except Exception as e:
+            print(f"❌ Failed to forward to {group_id}: {e}")
+
+async def send_scheduled_messages(bot: Bot):
+    while True:
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        text = f"📢 Scheduled message sent at {now}."
+        for group_id in TARGET_GROUPS:
+            try:
+                await bot.send_message(chat_id=group_id, text=text)
+                print(f"🕒 Sent scheduled message to {group_id} at {now}")
+            except Exception as e:
+                print(f"❌ Failed to send scheduled message to {group_id}: {e}")
+        await asyncio.sleep(SCHEDULE_INTERVAL_SECONDS)
+
+async def main():
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    app.add_handler(MessageHandler(filters.ALL, forward_handler))
+    asyncio.create_task(send_scheduled_messages(app.bot))
+    print("🚀 Bot is running.")
+    await app.run_polling()
+
+if __name__ == "__main__":
+    asyncio.run(main())

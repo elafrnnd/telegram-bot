@@ -9,7 +9,7 @@ import asyncio
 from datetime import datetime
 
 # === CONFIGURATION ===
-BOT_TOKEN = 8043955129:AAGiatxpVMhkKrjUV_Jj79K5e7FRyAtJK2I
+BOT_TOKEN = 
 SOURCE_USER_ID = 7635291775
 TARGET_GROUPS = 2442024861
 SEND_INTERVAL = 10 * 60  # 1 minutes (in seconds)
